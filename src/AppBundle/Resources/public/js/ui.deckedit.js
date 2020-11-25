@@ -85,6 +85,8 @@ ui.set_max_qty = function set_max_qty() {
 ui.build_faction_selector = function build_faction_selector() {
 	//app.deck.choices.push({'faction_select':["guardian","seeker"]});
 
+    $('#complex_selector').empty();
+    $('#complex_selector').hide();
 	$('#faction_selector').hide();
 	$('#deck_size_selector').hide();
 
@@ -102,6 +104,27 @@ ui.build_faction_selector = function build_faction_selector() {
 					//label.tooltip({container: 'body'});
 					$('[data-filter=faction_selector]').append(label);
 				});
+			}
+			if (choice.complex_select) {
+				$('#complex_selector').show();
+				var label = $("<label>" + choice.name + "</label>");
+				$('#complex_selector').append(label);
+				var select = $('<select class="form-control" data-filter="complex_selector" data-selector="' + choice.name + '"></select>');
+				$('#complex_selector').append(select);
+
+				for (option_name in choice.complex_select) {
+					var option = $('<option value="' + option_name + '" title="'+option_name+'"> ' + option_name + '</option>');
+					select.append(option);
+				};
+
+				select.on({
+					change : function(event){
+						app.deck.meta.complex_selected[event.target.dataset.selector] = event.target.value;
+						ui.refresh_deck();
+						ui.refresh_lists();
+					}
+				});
+
 			}
 			if (choice.deck_size_select) {
 				$('#deck_size_selector').show();
@@ -367,6 +390,11 @@ ui.init_selectors = function init_selectors() {
 	if (app.deck.meta){
 		if (app.deck.meta.faction_selected){
 			$('[data-filter=faction_selector]').val(app.deck.meta.faction_selected);
+		}
+		if (app.deck.meta.complex_selected){
+			for (selector in app.deck.meta.complex_selected) {
+				$('[data-selector="' + selector + '"]').val(app.deck.meta.complex_selected[selector]);
+			}
 		}
 		if (app.deck.meta.deck_size_selected){
 			$('[data-filter=deck_size_selector]').val(app.deck.meta.deck_size_selected);
