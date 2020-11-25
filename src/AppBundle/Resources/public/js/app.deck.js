@@ -188,6 +188,15 @@ deck.onloaded = function(data){
 					deck.meta.faction_selected = option.faction_select[0];
 				}
 			}
+			if (option.complex_select){
+				deck.choices.push(option);
+				if (!deck.meta || !deck.meta.complex_selected){
+					deck.meta.complex_selected = {};
+				}
+				if ((!option.name in deck.meta.complex_selected)){
+					deck.meta.complex_selected[option.name] = Object.keys(option.complex_select)[0];;
+				}
+			}
 			if (option.deck_size_select){
 				deck.choices.push(option);
 				if (!deck.meta || !deck.meta.deck_size_selected){
@@ -1290,9 +1299,29 @@ deck.can_include_card = function can_include_card(card, limit_count, hard_count)
 	// store the overflow from one rule to another for deck limit counting
 	var overflow = 0;
 	if (deck.deck_options && deck.deck_options.length) {
+		var expanded_options = deck.deck_options.reduce(function(acc, option) {
+			if (option.complex_select && app.deck.meta) {
+				if (option.name in app.deck.meta.complex_selected){
+					var selected_option = option.complex_select[app.deck.meta.complex_selected[option.name]];
+					if (Array.isArray(selected_option)) {
+						selected_option.forEach(function(sub_option) {
+							acc.push(sub_option);
+						});
+					}
+					else {
+						acc.push(selected_option);
+					}
+				}
+			}
 
-		for (var i = 0; i < deck.deck_options.length; i++){
-			var option = deck.deck_options[i];
+			else {
+				acc.push(option);
+			}
+			return acc;
+		}, []);
+
+		for (var i = 0; i < expanded_options.length; i++){
+			var option = expanded_options[i];
 
 			var valid = false;
 
