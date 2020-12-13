@@ -366,6 +366,17 @@ deck.get_investigator_code = function get_investigator_code() {
 
 /**
  * @memberOf deck
+ * @returns string[]
+ */
+deck.get_required_cards = function() {
+    var investigator = app.data.cards.findById(this.get_investigator_code());
+    return Object.values(investigator.deck_requirements.card)
+		.map(req => Object.keys(req))
+		.flat();
+}
+
+/**
+ * @memberOf deck
  * @returns string
  */
 deck.get_exiles = function get_exiles() {
@@ -416,6 +427,9 @@ deck.get_draw_deck = function get_draw_deck(sort) {
 	return deck.get_cards(sort, {
 		type_code: {
 			'$nin' : []
+		},
+		code: {
+			'$nin': deck.get_required_cards()
 		},
 		xp: {
 			'$exists': true
@@ -925,7 +939,7 @@ deck.create_card = function create_card(card, field='indeck'){
 	if(card.taboo_xp && card.taboo_xp > 0) {
 		$div.append(app.format.xp(card.taboo_xp, card.indeck, "taboo"));
 	}
-	if(card.xp === undefined) {
+    if(card.xp === undefined || deck.get_required_cards().includes(card.code)) {
 		$div.append(' <span class="fa fa-star" title="Does not count towards deck size"></span>');
 	}
 	if(card.ignore) {
