@@ -42,9 +42,10 @@ ui.upgrade = function upgrade(deck_id) {
 }
 
 ui.create_exile_list = function create_exile_list(){
+    var deceive_reality = app.data.cards.findById("41077");
 	var exile_cards = app.data.cards.find({
 		exile: {
-			'$eq': true
+			'$eq': deceive_reality.indeck < 1
 		},
 		indeck: {
 			'$gt': 0
