@@ -370,7 +370,7 @@ deck.get_investigator_code = function get_investigator_code() {
  */
 deck.get_required_cards = function() {
     var investigator = app.data.cards.findById(this.get_investigator_code());
-    return Object.values(investigator.deck_requirements.card)
+    return Object.values(investigator.deck_requirements.card || {})
 		.map(req => Object.keys(req))
 		.flat();
 }
