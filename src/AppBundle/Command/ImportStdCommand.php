@@ -559,7 +559,18 @@ class ImportStdCommand extends ContainerAwareCommand
 
 		// if the field is a data, the default assumptions above are wrong
 		if(in_array($type, ['date', 'datetime'])) {
-			if($newJsonValue !== null) {
+		if ($newJsonValue instanceof \DateTime) {
+			$newTypedValue = $newJsonValue;
+			switch($type) {
+					case 'date': {
+				$newJsonValue = $newTypedValue->format('Y-m-d');
+						break;
+					}
+					case 'datetime': {
+				$newJsonValue = $newTypedValue->format('Y-m-d H:i:s');
+					}
+				}
+		} elseif($newJsonValue !== null) {
 				$newTypedValue = new \DateTime($newJsonValue);
 			}
 			if($currentTypedValue !== null) {
