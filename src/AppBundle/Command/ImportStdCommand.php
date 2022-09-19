@@ -476,6 +476,8 @@ class ImportStdCommand extends ContainerAwareCommand
 					'flavor',
 					'traits',
 					'text',
+					'customization_text',
+					'customization_change',
 					'cost',
 					'skill_willpower',
 					'skill_intellect',
@@ -487,6 +489,7 @@ class ImportStdCommand extends ContainerAwareCommand
 					'restrictions',
 					'slot',
 					'deck_options',
+					'customization_options',
 					'deck_requirements',
 					'subname',
 					'bonded_to',
@@ -559,18 +562,21 @@ class ImportStdCommand extends ContainerAwareCommand
 
 		// if the field is a data, the default assumptions above are wrong
 		if(in_array($type, ['date', 'datetime'])) {
-		if ($newJsonValue instanceof \DateTime) {
-			$newTypedValue = $newJsonValue;
-			switch($type) {
-					case 'date': {
-				$newJsonValue = $newTypedValue->format('Y-m-d');
-						break;
-					}
-					case 'datetime': {
-				$newJsonValue = $newTypedValue->format('Y-m-d H:i:s');
-					}
+			if ($newJsonValue instanceof \DateTime) {
+				$newTypedValue = $newJsonValue;
+				switch($type) {
+				case 'date': {
+					$newJsonValue = $newTypedValue->format('Y-m-d');
+					break;
 				}
-		} elseif($newJsonValue !== null) {
+				case 'datetime': {
+					$newJsonValue = $newTypedValue->format('Y-m-d H:i:s');
+				}
+				}
+			} elseif($newJsonValue !== null) {
+				if (gettype($newJsonValue) !== "string") {
+					return;
+				}
 				$newTypedValue = new \DateTime($newJsonValue);
 			}
 			if($currentTypedValue !== null) {
@@ -633,7 +639,7 @@ class ImportStdCommand extends ContainerAwareCommand
 			}
 		}
 
-		if ($key == "deck_options"){
+		if ($key == "deck_options" || $key == "customization_options"){
 			if ($value){
 				$value = json_encode($value);
 			}
