@@ -1283,6 +1283,8 @@ deck.get_copies_and_deck_limit = function get_copies_and_deck_limit() {
 			deck_limit = 1;
 		} else if(typeof card.real_text !== 'undefined' && card.real_text.indexOf('Myriad.') !== -1) {
 			deck_limit = 3;
+		} else if (card.code === '08114' || card.code === '08115') {
+			deck_limit = 2;
 		}
 
 		if(!value) {
@@ -1698,6 +1700,26 @@ deck.can_include_card = function can_include_card(card, options) {
 				}
 			}
 
+			if (option.tag){
+				// needs to match at least one trait
+				var tag_valid = false;
+
+				for(var j = 0; j < option.tag.length; j++){
+					var tag = option.tag[j];
+
+					if (
+						(card.tags && card.tags.toUpperCase().indexOf(tag.toUpperCase()+".") !== -1) ||
+						(selected_customizations.length && _.find(selected_customizations, function(c) { return c.tags && c.tags.toUpperCase().indexOf(tag.toUpperCase()+".") !== -1; }))
+					) {
+						tag_valid = true;
+					}
+				}
+
+				if (!tag_valid){
+					continue;
+				}
+			}
+
 			if (option.uses){
 				// needs to match at least one trait
 				var uses_valid = false;
@@ -1714,26 +1736,6 @@ deck.can_include_card = function can_include_card(card, options) {
 				}
 
 				if (!uses_valid){
-					continue;
-				}
-
-			}
-
-			if (option.text){
-				// match a regular custom expression on the text
-				var text_valid = false;
-
-				for(var j = 0; j < option.text.length; j++){
-					var text = option.text[j];
-					if (
-						(card.real_text && card.real_text.toLowerCase().match(text)) ||
-						(selected_customizations.length && _.find(selected_customizations, function(c) { return c.real_text && c.real_text.toLowerCase().match(text); }))
-					){
-						text_valid = true;
-					}
-				}
-
-				if (!text_valid){
 					continue;
 				}
 
