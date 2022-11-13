@@ -950,11 +950,11 @@ ui.on_customization_change = function on_customization_change(card_code, index, 
 	var option = (card.customization_options && card.customization_options[index]) || {};
 	var unlocked = option.xp === xp;
 	var new_entry = {
-		index,
-		xp,
-		option,
-		choice,
-		unlocked,
+		index: index,
+		xp: xp,
+		option: option,
+		choice: choice,
+		unlocked: unlocked,
 		line: (card.customization_text && card.customization_text.split("\n")[index]) || '',
 	}
 
@@ -975,7 +975,7 @@ ui.on_customization_change = function on_customization_change(card_code, index, 
 	app.deck.meta['cus_' + card_code] = app.deck.encode_customizations(customizations);
 
 	if (option.deck_limit) {
-		var update = {customizations};
+		var update = {customizations: customizations};
 		update.maxqty = unlocked ? option.deck_limit : card.deck_limit;
 		card.maxqty = update.maxqty;
 		if (card.indeck) {
@@ -985,7 +985,7 @@ ui.on_customization_change = function on_customization_change(card_code, index, 
 		}
 		app.data.cards.updateById(card_code, update);
 	} else {
-		app.data.cards.updateById(card_code, {customizations});
+		app.data.cards.updateById(card_code, {customizations: customizations});
 	}
 	card.customizations = customizations.sort(function(a, b) {
 		return a.index - b.index;
@@ -1114,7 +1114,6 @@ ui.setup_event_handlers = function setup_event_handlers() {
 	$('#special-collection').on('change', 'input[type=radio]', ui.on_list_quantity_change);
 
 	$('#deck').on('click', 'a[data-random]', ui.select_basic_weakness);
-	$('#deck').on('click', 'a[data-customize]', ui.select_basic_weakness);
 	$('#deck').on('click', '#xp_up', ui.on_adjust_xp_up);
 	$('#deck').on('click', '#xp_down', ui.on_adjust_xp_down);
 

@@ -289,23 +289,30 @@ deck.parse_customizations = function(card, entry) {
 		return [];
 	}
 	var lines = (card.customization_text || '').split('\n');
-	return _.map(entry.split(','), function(value) {
+	var values = entry.split(',');
+	var customizations = [];
+	for (var i = 0; i < values.length; i++) {
+		var value = values[i];
 		var parts = value.split('|');
-		var index = parseInt(parts[0]);
-		var xp = parseInt(parts[1]);
-		var option = card.customization_options[index] || {};
-		var result = {
-			index,
-			xp,
-			unlocked: !option.xp || (option && option.xp === xp),
-			option,
-			line: lines[index] || '',
-		};
-		if (parts.length > 2) {
-			result.choice = parts[2];
+		// Defensive programming against malformed input.
+		if (parts.length > 1 && parts[0] && parts[1] && parts[0] !== 'NaN' && parts[1] !== 'NaN') {
+			var index = parseInt(parts[0]);
+			var xp = parseInt(parts[1]);
+			var option = card.customization_options[index] || {};
+			var result = {
+				index: index,
+				xp: xp,
+				unlocked: !option.xp || (option && option.xp === xp),
+				option: option,
+				line: lines[index] || '',
+			};
+			if (parts.length > 2) {
+				result.choice = parts[2];
+			}
+			customizations.push(result);
 		}
-		return result;
-	});
+	}
+	return customizations;
 }
 
 /**
@@ -363,7 +370,7 @@ deck.encode_customizations = function encode_customizations(customizations) {
 		if (key.indexOf('cus_') === 0) {
 			var code = key.substring(4);
 			var customizations = deck.decode_customizations(code, meta[key]);
-			app.data.cards.updateById(code, {customizations});
+			app.data.cards.updateById(code, {customizations: customizations});
 		}
 	});
 }
@@ -1107,7 +1114,7 @@ deck.create_card = function create_card(card, field='indeck'){
 		$div.append(' <span class="icon-eldersign" style="color:orange;" title="Exceptional. Double xp cost and limit one per deck."></span>');
 	}
 	if (card.customization_options) {
-		$div.append(' <a class="fa fa-star" style="color:orange; title="Customize" data-customize="'+card.code+'"><span></span></a>');
+		$div.append(' <span class="fa fa-star" style="color:orange; title="Customize" data-customize="'+card.code+'"></span>');
 	}
 
 	if (!no_collection){
@@ -1290,7 +1297,7 @@ deck.get_copies_and_deck_limit = function get_copies_and_deck_limit() {
 		if(!value) {
 			copies_and_deck_limit[card.real_name] = {
 				nb_copies: card.indeck - card.ignore,
-				deck_limit
+				deck_limit: deck_limit,
 			};
 		} else {
 			value.nb_copies += card.indeck - card.ignore;
