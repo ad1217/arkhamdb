@@ -125,6 +125,15 @@ ui.build_faction_selector = function build_faction_selector() {
 				app.deck.meta.deck_size_selected = option.deck_size_select[0];
 			}
 		}
+		if (option.complex_select){
+			choices.push(option);
+			if (!app.deck.meta || !app.deck.meta.complex_selected){
+				app.deck.meta.complex_selected = {};
+			}
+			if ((!option.name in app.deck.meta.complex_selected)){
+				app.deck.meta.complex_selected[option.name] = Object.keys(option.complex_select)[0];;
+			}
+		}
 		if (option.option_select){
 			choices.push(option);
 			if (!app.deck.meta || !app.deck.meta.option_selected){

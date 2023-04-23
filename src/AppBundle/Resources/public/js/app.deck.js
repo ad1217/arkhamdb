@@ -1610,7 +1610,7 @@ deck.can_include_card = function can_include_card(card, options) {
 	var overflow = 0;
 	if (deck.deck_options && deck.deck_options.length) {
 		var expanded_options = deck.deck_options.reduce(function(acc, option) {
-			if (option.complex_select && app.deck.meta) {
+			if (option.complex_select && app.deck.meta && app.deck.meta.complex_selected) {
 				if (option.name in app.deck.meta.complex_selected){
 					var selected_option = option.complex_select[app.deck.meta.complex_selected[option.name]];
 					if (Array.isArray(selected_option)) {
