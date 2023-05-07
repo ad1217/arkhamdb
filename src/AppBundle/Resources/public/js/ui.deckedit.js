@@ -131,7 +131,7 @@ ui.build_faction_selector = function build_faction_selector() {
 				app.deck.meta.complex_selected = {};
 			}
 			if ((!option.name in app.deck.meta.complex_selected)){
-				app.deck.meta.complex_selected[option.name] = Object.keys(option.complex_select)[0];;
+				app.deck.meta.complex_selected[option.name] = Object.keys(option.complex_select)[0];
 			}
 		}
 		if (option.option_select){
