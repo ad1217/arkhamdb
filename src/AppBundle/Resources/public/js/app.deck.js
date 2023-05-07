@@ -207,7 +207,6 @@ deck.onloaded = function(data){
 				}
 			}
 			if (option.complex_select){
-				deck.choices.push(option);
 				if (!deck.meta || !deck.meta.complex_selected){
 					deck.meta.complex_selected = {};
 				}
