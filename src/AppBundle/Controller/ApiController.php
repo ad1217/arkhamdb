@@ -366,6 +366,7 @@ class ApiController extends Controller
 	 */
 	public function listCardsAction(Request $request)
 	{
+		ini_set('zlib.output_compression', 1);
 		$locale = $request->getLocale();
 
 		$response = new Response();
@@ -380,44 +381,70 @@ class ApiController extends Controller
 		$include_encounter = $request->query->get('encounter');
 
 		if ($include_encounter){
-			$list_cards = $this->getDoctrine()->getRepository('AppBundle:Card')->findAll();
+			$file = "cards-all-";
 		}else {
-			$list_cards = $this->getDoctrine()->getRepository('AppBundle:Card')->findAllWithoutEncounter();
+			$file = "cards-player-";
 		}
+		$file .= $locale.".json";
 
-		// check the last-modified-since header
+		$webdir = $this->container->get('kernel')->getRootDir() . "/../web";
+		$file = $webdir."/".$file;
 
-		$bonded_cards = [];
-		$lastModified = NULL;
-		/* @var $card \AppBundle\Entity\Card */
-		foreach($list_cards as $card) {
-			if(!$lastModified || $lastModified < $card->getDateUpdate()) {
-				$lastModified = $card->getDateUpdate();
+		if (file_exists($file)) {
+			$date = new \DateTime();
+			$lastModified = $date->setTimestamp(filemtime($file));
+			$response->setLastModified($lastModified);
+			if ($response->isNotModified($request)) {
+				return $response;
 			}
-			if ($card->getBondedTo()) {
-				$matching_cards = $this->getDoctrine()->getRepository('AppBundle:Card')->findBy(['realName' => $card->getBondedTo()]);
-				if (count($matching_cards) > 0) {
-					foreach($matching_cards as $matching_card) {
-						if (!isset($bonded_cards[$matching_card->getCode()])) {
-							$bonded_cards[$matching_card->getCode()] = [];
+			$content = file_get_contents($file);
+		} else {
+
+			$cards = $this->getDoctrine()->getRepository('AppBundle:Card')->findBy([], ['dateUpdate' => 'DESC'], 1, 0);
+
+			// check the last-modified-since header
+			$lastModified = NULL;
+			/* @var $card \AppBundle\Entity\Card */
+			if($cards && isset($cards[0])) {
+				if(!$lastModified || $lastModified < $cards[0]->getDateUpdate()) {
+					$lastModified = $cards[0]->getDateUpdate();
+				}
+			}
+
+			$response->setLastModified($lastModified);
+			if ($response->isNotModified($request)) {
+				return $response;
+			}
+
+			if ($include_encounter){
+				$list_cards = $this->getDoctrine()->getRepository('AppBundle:Card')->findAll();
+			}else {
+				$list_cards = $this->getDoctrine()->getRepository('AppBundle:Card')->findAllWithoutEncounter();
+			}
+
+			$bonded_cards = [];
+			foreach($list_cards as $card) {
+				if ($card->getBondedTo()) {
+					$matching_cards = $this->getDoctrine()->getRepository('AppBundle:Card')->findBy(['realName' => $card->getBondedTo()]);
+					if (count($matching_cards) > 0) {
+						foreach($matching_cards as $matching_card) {
+							if (!isset($bonded_cards[$matching_card->getCode()])) {
+								$bonded_cards[$matching_card->getCode()] = [];
+							}
+							$bonded_cards[$matching_card->getCode()][] = ["count" => $card->getBondedCount(), "code" => $card->getCode()];
 						}
-						$bonded_cards[$matching_card->getCode()][] = ["count" => $card->getBondedCount(), "code" => $card->getCode()];
 					}
 				}
 			}
-		}
-		$response->setLastModified($lastModified);
-		if ($response->isNotModified($request)) {
-			return $response;
-		}
 
-		$cards = array();
-		/* @var $card \AppBundle\Entity\Card */
-		foreach($list_cards as $card) {
-			$cards[] = $this->get('cards_data')->getCardInfo($card, true, $bonded_cards);
-		}
+			$cards = array();
+			/* @var $card \AppBundle\Entity\Card */
+			foreach($list_cards as $card) {
+				$cards[] = $this->get('cards_data')->getCardInfo($card, true, $bonded_cards);
+			}
 
-		$content = json_encode($cards);
+			$content = json_encode($cards);
+		}
 		if(isset($jsonp))
 		{
 			$content = "$jsonp($content)";
