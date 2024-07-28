@@ -99,8 +99,9 @@ class SearchController extends Controller
 		$factions = $this->getDoctrine()->getRepository('AppBundle:Faction')->findAllAndOrderByName();
 		$encounters = $this->getDoctrine()->getRepository('AppBundle:Encounter')->findBy([], array("id" => "ASC"));
 
-		$list_traits = $dbh->executeQuery("SELECT DISTINCT c.traits FROM card c WHERE c.traits != ''")->fetchAll();
-		//$list_traits = $dbh->executeQuery("SELECT DISTINCT c.content as traits FROM ext_translations c WHERE c.field = 'traits' and c.content != ''")->fetchAll();
+		// use the repo to get translations
+		$list_traits = $this->getDoctrine()->getRepository('AppBundle:Card')->findTraits();
+
 		$traits = [];
 		foreach($list_traits as $card) {
 			$subs = explode('.', $card["traits"]);
@@ -110,6 +111,18 @@ class SearchController extends Controller
 		}
 		$traits = array_filter(array_keys($traits));
 		sort($traits);
+
+		$list_slots = $this->getDoctrine()->getRepository('AppBundle:Card')->findSlots();
+
+		$slots = [];
+		foreach($list_slots as $card) {
+			$subs = explode('.', $card["slot"]);
+			foreach($subs as $sub) {
+				$slots[trim($sub)] = 1;
+			}
+		}
+		$slots = array_filter(array_keys($slots));
+		sort($slots);
 
 		$list_illustrators = $dbh->executeQuery("SELECT DISTINCT c.illustrator FROM card c WHERE c.illustrator != '' ORDER BY c.illustrator")->fetchAll();
 		$illustrators = array_map(function ($card) {
@@ -129,6 +142,7 @@ class SearchController extends Controller
 				"subtypes" => $subtypes,
 				"factions" => $factions,
 				"traits" => $traits,
+				"slots" => $slots,
 				"encounters" => $encounters,
 				"illustrators" => $illustrators,
 				"allsets" => $allsets,
