@@ -267,8 +267,7 @@ AppBundle\Entity\Card:
             length: 255
             nullable: true
         deckOptions:
-            type: string
-            length: 500
+            type: text
             nullable: true
         customizationOptions:
             type: string
