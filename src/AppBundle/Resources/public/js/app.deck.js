@@ -1111,7 +1111,9 @@ deck.create_card = function create_card(card, field='indeck'){
 		})
 	}
 
-	if (card[field]) {
+	if (Number.isInteger(field)) {
+		$div.prepend(field.toString()+'');
+	} else if (card[field]) {
 		$div.prepend(card[field]+'x ');
 	}
 	if(card.xp && card.xp > 0) {
@@ -1575,6 +1577,11 @@ deck.can_include_card = function can_include_card(card, options) {
 		}
 	}
 
+	// always allow weaknesses and story assets
+	if (card.deck_limit > 0 && card.xp == null) {
+		return true;
+	}
+
 	var real_slot = card.real_slot && card.real_slot.toUpperCase();
 
 	var selected_customizations = [];
@@ -1695,10 +1702,8 @@ deck.can_include_card = function can_include_card(card, options) {
 				}
 			}
 
-			if (option.permanent){
-				if (card.permanent !== option.permanent){
-					continue;
-				}
+			if (option.permanent != null && card.permanent !== option.permanent) {
+				continue;
 			}
 
 			if (option.slot){

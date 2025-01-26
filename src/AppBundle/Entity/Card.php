@@ -54,6 +54,7 @@ class Card implements \Gedmo\Translatable\Translatable, \Serializable
 				'faction3',
 				'pack',
 				'type',
+				'subtype',
 				'encounter',
 				'linked_to',
 				'alternate_of',
@@ -123,6 +124,19 @@ class Card implements \Gedmo\Translatable\Translatable, \Serializable
 				$optionalFields[] = 'health';
 				$optionalFields[] = 'health_per_investigator';
 				$optionalFields[] = 'encounter_position';
+				break;
+			case "enemy_location":
+				$optionalFields[] = 'clues_fixed';
+				$optionalFields[] = 'clues';
+				$optionalFields[] = 'encounter_position';
+				$optionalFields[] = 'enemy_damage';
+				$optionalFields[] = 'enemy_evade';
+				$optionalFields[] = 'enemy_fight';
+				$optionalFields[] = 'enemy_horror';
+				$optionalFields[] = 'health_per_investigator';
+				$optionalFields[] = 'health';
+				$optionalFields[] = 'shroud';
+				$optionalFields[] = 'victory';
 				break;
 			case "location":
 				$optionalFields[] = 'victory';
