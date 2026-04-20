@@ -103,12 +103,18 @@ td.type, td.faction {
 }
 .container.main {
 	margin-bottom: 5px;
-	padding-top: 10px;
+	padding-top: 8px;
 	padding-bottom: 10px;
 }
+
 .container.main.white {
 	background-color: #fff;
 }
+
+.dark .container.main.white {
+	background-color: #131313;
+}
+
 .container.main.admin {
 	background-color: #fff;
 	border: 1px solid red;
@@ -139,10 +145,18 @@ div.tags span.tag:not(:first-child)::before {
 }
 
 .social-icons>*{margin-left:5px}
-.social-icon-like{color:red}
-.social-icon-favorite{color:orange}
-.social-icon-comment{color:green}
-.social-icon-version{color:blue}
+.social-icon-like, .dark .social-icon-like {
+	color:red
+}
+.social-icon-favorite, .dark .social-icon-favorite {
+	color:orange
+}
+.social-icon-comment, .dark .social-icon-comment {
+	color:green
+}
+.social-icon-version, .dark .social-icon-version {
+	color:blue
+}
 
 /*** generic ****/
 
@@ -361,7 +375,7 @@ h4.deck-section {
 	background-repeat:no-repeat;
 	width:120px;height:55px;
 	background-size:270px 180px;
-	background-position: -5px -45px
+	background-position: -5px -38px
 }
 
 .card-faded-background {
@@ -437,9 +451,75 @@ div.site-slogan {
 
 /************ LIST OF DECKLISTS **************/
 
-.decklist-faction-image img {
-    height: 64px;
+.quick-search-decklists {
+	display: flex;
+	gap: 0.5rem;
+	justify-content: space-between;
+	flex: 1;
 }
+@media (max-width:992px){
+	.quick-search-decklists {
+		flex-direction: column;
+
+	}
+}
+
+.decklist-faction-image {
+	width: 120px;
+}
+
+.decklists-advanced-search {
+	display: none;
+	flex-direction: column;
+}
+.decklists-advanced-search a {
+	cursor: pointer;
+}
+
+.decklists-advanced-search > div {
+	gap: 0.5rem;
+	justify-content: stretch;
+	flex: 1;
+	padding-left: 1rem;
+	padding-right: 1rem;
+	display: flex;
+}
+.decklists-advanced-search > div > div {
+	flex: 1;
+}
+.decklists-advanced-search-expanded {
+	display: flex;
+}
+.decklists-advanced-search-toggle {
+	display: flex;
+	justify-content: flex-end;
+	align-items: center;
+	gap: 0.5rem;
+	cursor: pointer;
+}
+.decklists-advanced-search-toggle span {
+	font-size: 30px;
+}
+.decklists-advanced-packs-category {
+	display: grid;
+	grid-template-columns: calc(20%) calc(20%) calc(20%) calc(20%) calc(20%);
+	width: 100%;
+}
+.decklists-advanced-pack-checkbox input {
+	margin-right: 1rem;
+}
+@media (max-width:992px){
+	.decklists-advanced-search {
+		flex-direction: column;
+	}
+	.decklists-advanced-search > div {
+		flex-direction: column;
+	}
+	.decklists-advanced-packs-category {
+		grid-template-columns: calc(50%) calc(50%);
+	}
+}
+
 
 /************* DECKLIST *********************/
 
@@ -466,7 +546,7 @@ div.site-slogan {
 
 /************** FACTIONS COLORS **************/
 .bg-faction a, .bg-faction span {
-	color: inherit;
+
 }
 .bg-guardian {
 	background-color: #2b80c5 !important;

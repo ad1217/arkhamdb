@@ -325,6 +325,7 @@ AppBundle\Entity\Card:
                 - translatable
         octgnId:
             type: string
+            length: 1024
             nullable: true
             column: octgn_id
     uniqueConstraints:

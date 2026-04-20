@@ -9,6 +9,7 @@ use Symfony\Component\HttpFoundation\ResponseHeaderBag;
 use AppBundle\Entity\Deck;
 use AppBundle\Entity\Deckslot;
 use AppBundle\Entity\Card;
+use AppBundle\Model\DeckManager;
 use Doctrine\ORM\EntityManager;
 use Symfony\Component\HttpFoundation\Request;
 use AppBundle\Entity\Deckchange;
@@ -65,9 +66,7 @@ class BuilderController extends Controller
 				$investigator->setDeckRequirements($req);
 
 				// only have one investigator per faction and name
-				$investigator_key = preg_replace(
-					"/[^A-Za-z0-9 ]/", '', sprintf('%s (%s)', $investigator->getName(), $investigator->getFaction()->getName())
-				);
+				$investigator_key = $investigator->getCode();
 
 				if (!isset($all_unique_investigators[$investigator_key])) {
 					$all_unique_investigators[$investigator_key] = true;
@@ -941,8 +940,9 @@ class BuilderController extends Controller
 		]);
 	}
 
-	public function listAction ()
+	public function listAction ($page = 1, Request $request)
 	{
+		$dbh = $this->getDoctrine()->getConnection();
 		/* @var $user \AppBundle\Entity\User */
 		$user = $this->getUser();
 
@@ -951,44 +951,142 @@ class BuilderController extends Controller
 		$decks = $em->getRepository('AppBundle:Deck')->findBy(["user"=> $user->getId(), "nextDeck" => null], array("dateUpdate" => "DESC"));
 		$tournaments = [];
 
-		if(count($decks))
-		{
-			$tags = [];
-			$previous_decks = [];
-			foreach($decks as $deck) {
-				$tags[] = $deck->getTags();
-				$temp_deck = $deck;
-				$previous_decks[$deck->getId()] = [];
-				if ($temp_deck->getPreviousDeck()){
-					while ($temp_deck->getPreviousDeck()){
-						$temp_deck = $temp_deck->getPreviousDeck();
-						$previous_decks[$deck->getId()][] = $temp_deck;
-					}
-				}
-			}
-			$tags = array_unique($tags);
-			return $this->render('AppBundle:Builder:decks.html.twig',
-			array(
-				'pagetitle' => "My Decks",
-				'pagedescription' => "Create custom decks with the help of a powerful deckbuilder.",
-				'decks' => $decks,
-				'previousdecks' => $previous_decks,
-				'tags' => $tags,
-				'nbmax' => $user->getMaxNbDecks(),
-				'nbdecks' => count($decks),
-				'cannotcreate' => $user->getMaxNbDecks() <= count($decks),
-				'tournaments' => $tournaments,
-			));
+		$investigator_code = filter_var($request->query->get('investigator'), FILTER_SANITIZE_STRING);
+		$tag = filter_var($request->query->get('tag'), FILTER_SANITIZE_STRING);
+		$sort = filter_var($request->query->get('sort'), FILTER_SANITIZE_STRING);
+		$category = filter_var($request->query->get('category'), FILTER_SANITIZE_STRING);
+		$collection = filter_var($request->query->get('collection'), FILTER_SANITIZE_STRING);
+		$perPage = filter_var($request->query->get('perPage'), FILTER_SANITIZE_NUMBER_INT);
+		$cards_code = $request->query->get('cards');
+		$deck_name = filter_var($request->query->get('name'), FILTER_SANITIZE_STRING);
 
+		/**
+		* @var $deck_manager DeckManager
+		*/
+		$deck_manager = $this->get('deck_manager');
+		if ($perPage && in_array($perPage, [10,25,50,100])){
+			$deck_manager->setLimit($perPage);
+		} else {
+			$deck_manager->setLimit(25);
 		}
-		else
+		$deck_manager->setPage($page);
+		$deck_manager->setUser($user);
+
+		$tags = $deck_manager->getAllTags();
+		$tags = array_unique($tags);
+		asort($tags);
+
+		$paginator = $deck_manager->findDecksWithComplexSearch($user);
+
+		$investigator_type = $this->getDoctrine()->getRepository('AppBundle:Type')->findOneBy(['code' => 'investigator'], ['id' => 'DESC']);
+		$all_investigators = $this->getDoctrine()->getRepository('AppBundle:Card')->findBy(['type' => $investigator_type, "duplicate_of" => null, "alternate_of" => null, "hidden" => false, "permanent" => false], ['name' => 'ASC']);
+
+		$unique_investigators = [];
+		$investigators = [];
+		foreach($all_investigators as $investigator) {
+			$deck_requirements = $this->get('deck_validation_helper')->parseReqString($investigator->getDeckRequirements());
+			if (!isset($deck_requirements['size'])) {
+				continue;
+			}
+			$unique_key = $investigator->getCode();
+			if (isset($unique_investigators[$unique_key])) {
+				continue;
+			}
+			$unique_investigators[$unique_key] = true;
+			$investigators[] = $investigator;
+		}
+
+		$cardFilters = '';
+		if (! empty($cards_code) && is_array($cards_code)) {
+			$cards = $dbh->executeQuery(
+			"SELECT
+			c.name,
+			c.code,
+			f.code faction_code,
+			c.xp,
+			c.position,
+			p.name as pack_name
+			from card c
+			join faction f on f.id=c.faction_id
+			join pack p on p.id = c.pack_id
+			where c.code in (?)
+			order by c.code desc", array($cards_code), array(\Doctrine\DBAL\Connection::PARAM_INT_ARRAY))
+			->fetchAll();
+
+			foreach($cards as $card) {
+				$cardFilters .= $this->renderView('AppBundle:Search:card.html.twig', $card);
+			}
+		}
+
+		$header = $this->renderView('AppBundle:Builder:form-quick.html.twig',
+			array(
+				'investigators' => $investigators,
+				'investigator_code' => $investigator_code,
+				'tag' => $tag,
+				'tags' => $tags,
+				'sort' => $sort,
+				'perPage' => $perPage,
+				'category' => $category,
+				'collection' => $collection
+			)
+		);
+
+		$deck_data = [];
+		$iterator = $paginator->getIterator();
+		while($iterator->valid())
 		{
+			$deck = $iterator->current();
+
+			$previous_deck = $deck->getPreviousDeck();
+			$previous_decks = [];
+			while ($previous_deck) {
+				$previous_decks[] = $previous_deck;
+				$previous_deck = $previous_deck->getPreviousDeck();
+			}
+
+			$investigator = $deck->getCharacter();
+
+			$meta = $deck->getMeta() ? json_decode($deck->getMeta(), true) : null;
+
+			$deck_data[] = [
+				'faction' => $deck->getCharacter()->getFaction(),
+				'deck' => $deck,
+				'meta' => $meta,
+				'previous_decks' => $previous_decks
+			];
+			$iterator->next();
+		}
+
+		$expanded = false;
+		if ($cardFilters || $deck_name) {
+			$expanded = true;
+		}
+
+		if(count($decks)) {
+			return $this->render('AppBundle:Builder:decks.html.twig',
+				array(
+					'pagetitle' => "My Decks",
+					'pagedescription' => "Create custom decks with the help of a powerful deckbuilder.",
+					'decks' => $deck_data,
+					'cardFilters' => $cardFilters,
+					'expanded' => $expanded,
+					'name' => $deck_name,
+					'tags' => $tags,
+					'nbmax' => $user->getMaxNbDecks(),
+					'nbdecks' => count($decks),
+					'header' => $header,
+					'cannotcreate' => $user->getMaxNbDecks() <= count($decks),
+					'pages' => $deck_manager->getClosePages(),
+					'prevurl' => $deck_manager->getPreviousUrl(),
+					'nexturl' => $deck_manager->getNextUrl(),
+				)
+			);
+		} else {
 			return $this->render('AppBundle:Builder:no-decks.html.twig',
 				array(
 					'pagetitle' => "My Decks",
 					'pagedescription' => "Create custom decks with the help of a powerful deckbuilder.",
-					'nbmax' => $user->getMaxNbDecks(),
-					'tournaments' => $tournaments,
+					'nbmax' => $user->getMaxNbDecks()
 				)
 			);
 		}

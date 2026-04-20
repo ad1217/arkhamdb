@@ -15,18 +15,16 @@ use AppBundle\Entity\Card;
 use Doctrine\Common\Collections\ArrayCollection;
 
 /**
- * The job of this class is to find and return decklists
- * @author alsciende
- * @property integer $maxcount Number of found rows for last request
- *
+ * The job of this class is to find and return decks
  */
-class DecklistManager
+class DeckManager
 {
 	protected $faction;
 	protected $page = 1;
 	protected $start = 0;
 	protected $limit = 30;
 	protected $maxcount = 0;
+	protected $user = false;
 	protected $popularityString = '(1+d.nbVotes)/(1 + POWER(DATE_DIFF(CURRENT_TIMESTAMP(), d.dateCreation), 1) )';
 
 	public function __construct(EntityManager $doctrine, RequestStack $request_stack, Router $router, LoggerInterface $logger)
@@ -53,6 +51,11 @@ class DecklistManager
 		$this->start = ($this->page - 1) * $this->limit;
 	}
 
+	public function setUser($user)
+	{
+		$this->user = $user;
+	}
+
 	public function getMaxCount()
 	{
 		return $this->maxcount;
@@ -65,14 +68,15 @@ class DecklistManager
 	{
 		$qb = $this->doctrine->createQueryBuilder();
 		$qb->select('d');
-		$qb->from('AppBundle:Decklist', 'd');
-		if($this->faction) {
-			$qb->join('d.character', 'c');
-			$qb->where('c.faction = :faction');
-			$qb->setParameter('faction', $this->faction);
-		}
+		$qb->from('AppBundle:Deck', 'd');
+		//$qb->addSelect('JSON_EXTRACT(d.meta, "aspect") as meta');
 		$qb->setFirstResult($this->start);
 		$qb->setMaxResults($this->limit);
+		if ($this->user) {
+			$qb->andWhere('d.user = :user');
+			$qb->setParameter('user', $this->user);
+		}
+		$qb->distinct();
 		$qb->andWhere('d.nextDeck IS NULL');
 		return $qb;
 	}
@@ -81,12 +85,10 @@ class DecklistManager
 	 * creates the paginator around the query
 	 * @param Query $query
 	 */
-	private function getPaginator(Query $query, $withCount = true)
+	private function getPaginator(Query $query)
 	{
 		$paginator = new Paginator($query, $fetchJoinCollection = FALSE);
-		if ($withCount) {
-			$this->maxcount = $paginator->count();
-		}
+		$this->maxcount = $paginator->count();
 		return $paginator;
 	}
 
@@ -96,114 +98,30 @@ class DecklistManager
 		return new ArrayCollection([]);
 	}
 
-	public function findDecklistsByPopularity($withCount = true)
-	{
-		$qb = $this->getQueryBuilder();
-		$qb->addSelect('(1+d.nbVotes)/(1+POWER(DATE_DIFF(CURRENT_TIMESTAMP(), d.dateCreation), 1.2)) AS HIDDEN popularity');
-		$qb->orderBy('popularity', 'DESC');
-		return $this->getPaginator($qb->getQuery(), $withCount);
-	}
-
-	public function findDecklistsByInvestigator(Card $character, $ignoreEmptyDescriptions = FALSE)
-	{
-		$qb = $this->getQueryBuilder();
-		$qb->addSelect($this->popularityString.' AS HIDDEN popularity');
-		$qb->andWhere('d.character = :character');
-		$qb->setParameter('character', $character);
-		if ($ignoreEmptyDescriptions){
-			$qb->andWhere('LENGTH(d.descriptionHtml) > 199');
+	public function getAllTags(){
+		$qb = $this->doctrine->createQueryBuilder();
+		$qb->select('d.tags');
+		$qb->from('AppBundle:Deck', 'd');
+		if ($this->user) {
+			$qb->andWhere('d.user = :user');
+			$qb->setParameter('user', $this->user);
 		}
-		$qb->orderBy('popularity', 'DESC');
-
-		return $this->getPaginator($qb->getQuery());
+		$qb->andWhere('d.nextDeck IS NULL');
+		$qb->andWhere('d.tags IS NOT NULL');
+		$qb->andWhere('d.tags != :tags');
+		$qb->setParameter('tags', '');
+		$tags = [];
+		foreach($qb->getQuery()->getResult() as $deck) {
+			$tags = array_merge($tags, explode(" ", $deck['tags']));
+		}
+		return array_filter($tags);
 	}
 
-	public function findDecklistsByAge($ignoreEmptyDescriptions = FALSE, $withCount = true)
+	public function findDecksWithComplexSearch($user = false)
 	{
-		$qb = $this->getQueryBuilder();
-		$qb->andWhere('LENGTH(d.descriptionMd) > 40');
-		$qb->orderBy('d.dateCreation', 'DESC');
-		return $this->getPaginator($qb->getQuery(), $withCount);
-	}
-
-	public function findDecklistsByFavorite(User $user)
-	{
-		$qb = $this->getQueryBuilder();
-		$qb->leftJoin('d.favorites', 'u');
-		$qb->andWhere('u = :user');
-		$qb->setParameter('user', $user);
-		$qb->orderBy('d.dateCreation', 'DESC');
-		return $this->getPaginator($qb->getQuery());
-	}
-
-	public function findDecklistsByAuthor(User $user)
-	{
-		$qb = $this->getQueryBuilder();
-		$qb->andWhere('d.user = :user');
-		$qb->setParameter('user', $user);
-		$qb->orderBy('d.dateCreation', 'DESC');
-		return $this->getPaginator($qb->getQuery());
-	}
-
-	public function findDecklistsInHallOfFame()
-	{
-		$qb = $this->getQueryBuilder();
-		$qb->andWhere('d.nbVotes > 10');
-		$qb->orderBy('d.nbVotes', 'DESC');
-		return $this->getPaginator($qb->getQuery());
-	}
-
-	public function findDecklistsInHotTopic()
-	{
-		$qb = $this->getQueryBuilder();
-		$qb->addSelect('(SELECT count(co) FROM AppBundle:Comment co WHERE co.decklist=d AND DATE_DIFF(CURRENT_TIMESTAMP(), co.dateCreation)<1) AS HIDDEN nbRecentComments');
-		$qb->orderBy('nbRecentComments', 'DESC');
-		$qb->orderBy('d.nbComments', 'DESC');
-		return $this->getPaginator($qb->getQuery());
-	}
-
-	public function findDecklistsInTournaments()
-	{
-		$qb = $this->getQueryBuilder();
-		$qb->andWhere('d.tournament is not null');
-		$qb->orderBy('d.dateCreation', 'DESC');
-		return $this->getPaginator($qb->getQuery());
-	}
-
-	public function findDecklistsInSolo()
-	{
-		$qb = $this->getQueryBuilder();
-		$qb->andWhere("d.tags like '%solo%'");
-		$qb->orderBy('d.dateCreation', 'DESC');
-		return $this->getPaginator($qb->getQuery());
-	}
-
-	public function findDecklistsInMultiplayer()
-	{
-		$qb = $this->getQueryBuilder();
-		$qb->andWhere("d.tags like '%multiplayer%'");
-		$qb->orderBy('d.dateCreation', 'DESC');
-		return $this->getPaginator($qb->getQuery());
-	}
-
-	public function findDecklistsInBeginner()
-	{
-		$qb = $this->getQueryBuilder();
-		$qb->andWhere("d.tags like '%beginner%'");
-		$qb->orderBy('d.dateCreation', 'DESC');
-		return $this->getPaginator($qb->getQuery());
-	}
-
-	public function findDecklistsInTheme()
-	{
-		$qb = $this->getQueryBuilder();
-		$qb->andWhere("d.tags like '%theme%'");
-		$qb->orderBy('d.dateCreation', 'DESC');
-		return $this->getPaginator($qb->getQuery());
-	}
-
-	public function findDecklistsWithComplexSearch($user = false)
-	{
+		if (!$user) {
+			return;
+		}
 		$request = $this->request_stack->getCurrentRequest();
 
 		$cards_code = $request->query->get('cards');
@@ -211,9 +129,10 @@ class DecklistManager
 			$cards_code = [];
 		}
 
-		$faction_code = filter_var($request->query->get('faction'), FILTER_SANITIZE_STRING);
-		if($faction_code) {
-			$faction = $this->doctrine->getRepository('AppBundle:Faction')->findOneBy(['code' => $faction_code]);
+		$aspect = false;
+		$aspect_code = filter_var($request->query->get('aspect'), FILTER_SANITIZE_STRING);
+		if($aspect_code) {
+			$aspect = $this->doctrine->getRepository('AppBundle:Faction')->findOneBy(['code' => $aspect_code]);
 		}
 
 		$investigator = false;
@@ -222,12 +141,9 @@ class DecklistManager
 			$investigator = $this->doctrine->getRepository('AppBundle:Card')->findOneBy(['code' => $investigator_code]);
 		}
 
-		$author_name = filter_var($request->query->get('author'), FILTER_SANITIZE_STRING);
-
-		$decklist_name = filter_var($request->query->get('name'), FILTER_SANITIZE_STRING);
+		$deck_name = filter_var($request->query->get('name'), FILTER_SANITIZE_STRING);
 
 		$sort = $request->query->get('sort');
-
 		$packs = $request->query->get('packs');
 
 		$collection = filter_var($request->query->get('collection'), FILTER_SANITIZE_STRING);
@@ -272,74 +188,47 @@ class DecklistManager
 
 		$tag = filter_var($request->query->get('tag'), FILTER_SANITIZE_STRING);
 		if($tag) {
-			switch($tag) {
-				case "multiplayer":
-					$qb->andWhere("d.tags like '%multiplayer%'");
-					break;
-				case "theme":
-					$qb->andWhere("d.tags like '%theme%'");
-					break;
-				case "beginner":
-					$qb->andWhere("d.tags like '%beginner%'");
-					break;
-				case "solo":
-					$qb->andWhere("d.tags like '%solo%'");
-					break;
-			}
+			$qb->andWhere("d.tags like :tags");
+			$qb->setParameter("tags", '%'.$tag.'%');
 		}
 
-		$category = filter_var($request->query->get('category'), FILTER_SANITIZE_STRING);
-		if($category) {
-			switch($category) {
-				case "favorites":
-					$qb->leftJoin('d.favorites', 'u');
-					$qb->andWhere('u = :user');
-					$qb->setParameter('user', $user);
-					$qb->orderBy('d.dateCreation', 'DESC');
-					break;
-				case "mine":
-					if ($user) {
-						$qb->andWhere('d.user = :user');
-						$qb->setParameter('user', $user);
-						$qb->orderBy('d.dateCreation', 'DESC');
-					} else {
-						$qb->andWhere('true = false');
-					}
-					break;
-			}
-		}
-
-		if(!empty($faction)) {
-			$qb->join('d.character', 'a');
-			$qb->andWhere('a.faction = :faction');
-			//$qb->andWhere('d.faction = :faction');
-			$qb->setParameter('faction', $faction);
-		}
-		if(!empty($author_name)) {
-			$qb->innerJoin('d.user', 'u');
-			$joinTables[] = 'd.user';
-			$qb->andWhere('u.username = :username');
-			$qb->setParameter('username', $author_name);
-		}
-		if(! empty($decklist_name)) {
+		if(!empty($deck_name)) {
 			$qb->andWhere('d.name like :deckname');
-			$qb->setParameter('deckname', "%$decklist_name%");
+			$qb->setParameter('deckname', "%$deck_name%");
 		}
 		if(!empty($cards_code) || !empty($packs)) {
 			if (!empty($cards_code) ) {
 				foreach ($cards_code as $i => $card_code) {
 					/* @var $card \AppBundle\Entity\Card */
 					$card = $this->doctrine->getRepository('AppBundle:Card')->findOneBy(array('code' => $card_code));
-					if ($card->getType()->getCode() == "investigator"){
+					if ($card->getType()->getCode() == "hero"){
 						$qb->innerJoin('d.character', "s$i");
 						$qb->andWhere("s$i.code = :card$i");
 						$qb->setParameter("card$i", $card_code);
 						$packs[] = $card->getPack()->getId();
-					} else {
-						$qb->innerJoin('d.slots', "s$i");
-						$qb->andWhere("s$i.card = :card$i");
-						$qb->setParameter("card$i", $card);
+					} else if ($card->getType()->getCode() == "alter_ego" && !empty($card->getLinkedFrom())) {
+						$qb->innerJoin('d.character', "s$i");
+						$qb->andWhere("s$i.code = :card$i");
+						$qb->setParameter("card$i", $card->getLinkedFrom()[0]->getCode());
 						$packs[] = $card->getPack()->getId();
+					} else {
+						$packs[] = $card->getPack()->getId();
+						$cardsOr = [$card];
+						$dupeToCheck = $card;
+						// if the card is a duplicate of another
+						if ($card->getDuplicateOf()) {
+							$cardsOr[] = $card->getDuplicateOf();
+							$dupeToCheck = $card->getDuplicateOf();
+						}
+						// look up what this card duplicates and search for those also
+						if ($dupeToCheck->getDuplicates()) {
+							foreach($dupeToCheck->getDuplicates() as $j => $dupe) {
+								$cardsOr[] = $dupe;
+							}
+						}
+						$qb->innerJoin('d.slots', "s$i");
+						$qb->andWhere("s$i.card IN (:card$i)");
+						$qb->setParameter("card$i", $cardsOr);
 					}
 				}
 			}
@@ -349,41 +238,24 @@ class DecklistManager
 				$sub->from("AppBundle:Card","c");
 				$sub->innerJoin('AppBundle:Decklistslot', 's', 'WITH', 's.card = c');
 				$sub->where('s.decklist = d');
-				// if a second core set is included ignore check for card quantity
-				if (in_array("1-2", $packs)){
-					$sub->andWhere($sub->expr()->notIn('c.pack', $packs));
-				} else {
-					$sub->andWhere($sub->expr()->orX(
-						$sub->expr()->notIn('c.pack', $packs),
-						$sub->expr()->gt('s.quantity', 'c.quantity')
-					));
-				}
-				//$sub->where('s.quantity >= c.quantity');
-				//$qb->expr()->or()
-				//$sub->andWhere($sub->expr()->notIn('c.pack', $packs));
-
+				$sub->andWhere($sub->expr()->notIn('c.pack', $packs));
 				$qb->andWhere($qb->expr()->not($qb->expr()->exists($sub->getDQL())));
+
+				$qb->innerJoin('d.character', "heropacks");
+				$qb->andWhere($sub->expr()->in('heropacks.pack', $packs));
 			}
 		}
 
 		switch($sort) {
+			case 'name':
+				$qb->orderBy('d.name', 'ASC');
+				break;
 			case 'date':
 				$qb->orderBy('d.dateCreation', 'DESC');
 				break;
-			case 'likes':
-				$qb->orderBy('d.nbVotes', 'DESC');
-				break;
-			case 'reputation':
-				if(!in_array('d.user', $joinTables)) {
-					$qb->innerJoin('d.user', 'u');
-				}
-				$qb->addSelect('u.reputation AS HIDDEN reputation');
-				$qb->orderBy('reputation', 'DESC');
-				break;
-			case 'popularity':
+			case 'updated':
 			default:
-				$qb->addSelect($this->popularityString.' AS HIDDEN popularity');
-				$qb->orderBy('popularity', 'DESC');
+				$qb->orderBy('d.dateUpdate', 'DESC');
 				break;
 		}
 
